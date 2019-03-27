@@ -11,6 +11,6 @@ This repo contains TensorFlow implementation of DCGAN for Image Completion
   
   
 Members of project team:
-  Adam Stafiej
-  Andrzej Świerczyński
-  Hubert Skrzypczak
+  -Adam Stafiej
+  - Andrzej Świerczyński
+  - Hubert Skrzypczak
