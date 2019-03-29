@@ -1,6 +1,6 @@
 import tensorflow as tf
-from tensorflow.keras.layers import Input, Conv2DTranspose, Conv2D, Dense, Flatten,\
-    BatchNormalization, MaxPooling2D, LeakyReLU, concatenate, Lambda, ReLU
+from tensorflow.keras.layers import Input, Conv2DTranspose, Conv2D, Dense, Flatten, \
+    Reshape, BatchNormalization, MaxPooling2D, LeakyReLU, concatenate, Lambda, ReLU
 import numpy as np
 import matplotlib.pyplot as plt
 import h5py
@@ -10,7 +10,7 @@ tf.enable_eager_execution()
 
 def generator():
     filters = 32
-    inputs = Input(shape=(32, 32, 3), dtype=tf.float32, name='inputs')
+    inputs = Input(shape=(64, 64, 3), dtype=tf.float32, name='inputs')
     c1 = Conv2D(filters=filters, kernel_size=3, padding='same')(inputs)
     c1 = BatchNormalization()(c1)
     c1 = LeakyReLU(alpha=.001)(c1)
@@ -67,22 +67,14 @@ def generator():
 
 
 def discriminator():
-    model = tf.keras.Sequential()
-    model.add(Conv2D(32, input_shape=(32, 32, 3), kernel_size=5, padding='same'))
-    model.add(BatchNormalization())
-    model.add(ReLU())
-    model.add(MaxPooling2D(pool_size=2))
-    model.add(Conv2D(64, input_shape=(32, 32, 3), kernel_size=5, padding='same'))
-    model.add(BatchNormalization())
-    model.add(ReLU())
-    model.add(MaxPooling2D(pool_size=2))
-    model.add(Conv2D(128, input_shape=(32, 32, 3), kernel_size=5, padding='same'))
-    model.add(BatchNormalization())
-    model.add(ReLU())
-    model.add(MaxPooling2D(pool_size=2))
-    model.add(Flatten())
-    model.add(Dense(256, activation=tf.keras.activations.relu))
-    model.add(Dense(1, activation=tf.keras.activations.sigmoid))
+    vgg = tf.keras.applications.vgg16.VGG16(weights='imagenet', include_top=False, input_shape=(64, 64, 3))
+    vgg.trainable = False
+    flat_vgg = Flatten()(vgg.get_layer('block5_pool').output)
+    h1 = Dense(128, activation=tf.keras.activations.relu)(flat_vgg)
+    outputs = Dense(1, activation=tf.keras.activations.sigmoid)(h1)
+
+    model = tf.keras.Model(inputs=vgg.input, outputs=outputs)
+
     return model
 
 
@@ -97,19 +89,22 @@ dis_optimizer = tf.train.AdamOptimizer(1e-4)
 # dataset
 (train_x, _), (_, _) = tf.keras.datasets.cifar10.load_data()
 train_x = (train_x / 255.0).astype(dtype=np.float32)
+# resizing (cifar10 is 32x32x3, but vgg need 64x64x3)
+train_x = tf.image.resize_images(train_x, size=(64, 64))
 
 # 6x6 mask for image (for now it's fixed)
 mask = tf.ones_like(train_x).numpy()
 mask[:, 10:16, 12:18] = 0
 
 # parameters
-epoch_num = 10
+epoch_num = 5
 batch_size = 128
 
 for i in range(epoch_num):
     gen_avg_loss = np.array(0, dtype=np.float32)
     perceptual_accuracy = np.array(0, dtype=np.float32)
-    dis_avg_accuracy = np.array(0, dtype=np.float32)
+    dis_avg_real_accuracy = np.array(0, dtype=np.float32)
+    dis_avg_fake_accuracy = np.array(0, dtype=np.float32)
 
     for step in range(int(len(train_x) / batch_size)):
         real_images = train_x[step * batch_size: (step + 1) * batch_size]
@@ -118,25 +113,30 @@ for i in range(epoch_num):
             gen_output = gen(real_images * batch_mask, training=True)
             dis_fake_output = dis(gen_output, training=True)
 
-            contextual_loss = tf.reduce_sum(
-                tf.keras.losses.mean_squared_error(y_true=real_images * batch_mask, y_pred=gen_output * batch_mask))
-            perceptual_loss = 2 * tf.reduce_sum(
+            contextual_loss = tf.reduce_sum(tf.reduce_mean(
+                tf.keras.losses.mean_absolute_error(y_true=real_images * batch_mask, y_pred=gen_output * batch_mask),
+                axis=0))
+            perceptual_loss = tf.reduce_mean(
                 tf.keras.losses.binary_crossentropy(y_true=tf.ones_like(dis_fake_output), y_pred=dis_fake_output))
-            gen_loss = contextual_loss + 8 * perceptual_loss
+            gen_loss = contextual_loss + 0.3 * perceptual_loss
 
-            dis_fake_loss = tf.reduce_sum(
+            dis_fake_loss = tf.reduce_mean(
                 tf.keras.losses.binary_crossentropy(y_true=tf.zeros_like(dis_fake_output), y_pred=dis_fake_output))
 
             dis_real_output = dis(real_images, training=True)
 
-            dis_real_loss = tf.reduce_sum(
+            dis_real_loss = tf.reduce_mean(
                 tf.keras.losses.binary_crossentropy(y_true=tf.ones_like(dis_real_output), y_pred=dis_real_output))
 
             dis_loss = dis_real_loss + dis_fake_loss
 
-            dis_correct_preds_number = (tf.count_nonzero(dis_fake_output < 0.5).numpy() + tf.count_nonzero(dis_real_output >= 0.5).numpy())
-            dis_preds_len = len(np.array(dis_fake_output)) + len(np.array(dis_real_output))
-            dis_accuracy = dis_correct_preds_number / dis_preds_len
+            dis_correct_real_preds_number = tf.count_nonzero(dis_real_output >= 0.5).numpy()
+            dis_real_preds_len = len(np.array(dis_real_output))
+            dis_real_accuracy = dis_correct_real_preds_number / dis_real_preds_len
+
+            dis_correct_fake_preds_number = tf.count_nonzero(dis_fake_output < 0.5).numpy()
+            dis_fake_preds_len = len(np.array(dis_fake_output))
+            dis_fake_accuracy = dis_correct_fake_preds_number / dis_fake_preds_len
 
             gen_correct_preds_number = tf.count_nonzero(dis_fake_output >= 0.5).numpy()
             gen_preds_len = len(np.array(dis_fake_output))
@@ -144,7 +144,8 @@ for i in range(epoch_num):
 
         gen_avg_loss += gen_loss.numpy()
         perceptual_accuracy += gen_accuracy
-        dis_avg_accuracy += dis_accuracy
+        dis_avg_real_accuracy += dis_real_accuracy
+        dis_avg_fake_accuracy += dis_fake_accuracy
 
         gen_gradients = gen_tape.gradient(gen_loss, gen.trainable_variables)
         dis_gradients = dis_tape.gradient(dis_loss, dis.trainable_variables)
@@ -154,18 +155,20 @@ for i in range(epoch_num):
         if step % 10 == 9:
             print(".", end="")
 
-    print("\nEpisode {}, dis acc: {}, perceptual_acc {}, gen_loss: {}".
-          format(i, dis_avg_accuracy/(step+1), perceptual_accuracy/(step+1), gen_avg_loss/(step+1)))
-
+    print("\nEpisode {}, dis acc: fake {} real {}, perceptual_acc {}, gen_loss: {}".
+          format(i, dis_avg_fake_accuracy / (step + 1), dis_avg_real_accuracy / (step + 1),
+                 perceptual_accuracy / (step + 1), gen_avg_loss / (step + 1)))
 
 # saving models weights
-# gen.save_weights(filepath="./generator.h5")
-# dis.save_weights(filepath="./discriminator.h5")
+# gen.save_weights(filepath="./weights/generator.h5")
+# dis.save_weights(filepath="./weights/discriminator.h5")
 
 
-# see how it works on new images
+# see how it works on not seen images
 (_, _), (test_x, _) = tf.keras.datasets.cifar10.load_data()
 test_x = (test_x / 255.0).astype(dtype=np.float32)
+
+test_x = tf.image.resize_images(test_x[:10], size=(64, 64))
 
 image = gen(test_x[:6] * mask[:6], training=True)
 for i, im in enumerate(image):
@@ -180,5 +183,4 @@ for i in range(6):
     plt.subplot(3, 6, i + 1 + 12)
     plt.imshow(test_x[i])
 plt.show()
-
 
