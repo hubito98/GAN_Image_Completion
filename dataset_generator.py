@@ -1,17 +1,7 @@
-#!/usr/bin/env python
-# coding: utf-8
-
-# In[124]:
-
-
 import keras
 import numpy as np
 import matplotlib.pyplot as plt
 from random import randint
-
-
-# In[169]:
-
 
 class dataset_generator(object):
     
@@ -42,7 +32,6 @@ class dataset_generator(object):
             height = randint(self.min_mask, self.max_mask)
             width = randint(self.min_mask, self.max_mask)
             mask[x:x+width, y:y+height]=[0.,0.,0.]
-        plt.imshow(batch[0])
         
         return batch, masks
     
