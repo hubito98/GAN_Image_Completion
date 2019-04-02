@@ -49,9 +49,6 @@ for episode in range(epoch_num):
         # 0.5 value pixels on hole
         masked_images = masked_train_x[step * batch_size: (step + 1) * batch_size]
 
-        plt.imshow(masked_images[0])
-        plt.show()
-
         with tf.GradientTape() as gen_tape, tf.GradientTape() as dis_tape:
             # we want this to look like normal image, no holes
             gen_output = gen(masked_images, training=True)
