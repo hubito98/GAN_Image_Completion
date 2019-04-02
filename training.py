@@ -16,6 +16,7 @@ dis_lr = 1e-5
 min_mask = 10
 max_mask = 80
 image_rotation = 15
+images_in_epoch = batch_size*20
 
 # get generator and discriminator model
 gen = generator(input_shape=(256, 256, 3))
@@ -29,13 +30,10 @@ dis_optimizer = tf.train.AdamOptimizer(dis_lr)
 # dataset generator - basically "infinity" dataset
 dataset_generator = dataset_generator(image_dimensions=(256, 256), directory="./images",
                                       min_mask=min_mask, max_mask=max_mask, rotation=image_rotation,
-                                      batch_size=batch_size*20)
+                                      batch_size=batch_size)
 dataset_generator.generate_dataset()
 
 for episode in range(epoch_num):
-    # get train batch for epoch
-    images, mask = dataset_generator.get_batch()
-    masked_train_x = mask_images(images=images, mask=mask)
 
     # arrays for epoch summary
     gen_avg_loss = np.array(0, dtype=np.float32)
@@ -43,11 +41,10 @@ for episode in range(epoch_num):
     dis_avg_real_accuracy = np.array(0, dtype=np.float32)  # in 0..1 range
     dis_avg_fake_accuracy = np.array(0, dtype=np.float32)  # in 0..1 range
 
-    for step in range(int(len(masked_train_x) / batch_size)):
-        real_images = images[step * batch_size: (step + 1) * batch_size]
-        batch_mask = mask[step * batch_size: (step + 1) * batch_size]
-        # 0.5 value pixels on hole
-        masked_images = masked_train_x[step * batch_size: (step + 1) * batch_size]
+    for step in range(int(images_in_epoch / batch_size)):
+        # get train batch for epoch
+        real_images, batch_mask = dataset_generator.get_batch()
+        masked_images = mask_images(images=real_images, mask=batch_mask)
 
         with tf.GradientTape() as gen_tape, tf.GradientTape() as dis_tape:
             # we want this to look like normal image, no holes
