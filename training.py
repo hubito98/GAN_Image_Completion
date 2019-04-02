@@ -10,13 +10,13 @@ tf.enable_eager_execution()
 
 # learning hyperparameters
 epoch_num = 30
-batch_size = 128
+batch_size = 8
 gen_lr = 1e-4
 dis_lr = 1e-5
 min_mask = 10
 max_mask = 80
 image_rotation = 15
-images_in_epoch = batch_size*20
+images_in_epoch = batch_size*320
 
 # get generator and discriminator model
 gen = generator(input_shape=(256, 256, 3))
@@ -34,7 +34,6 @@ dataset_generator = dataset_generator(image_dimensions=(256, 256), directory="./
 dataset_generator.generate_dataset()
 
 for episode in range(epoch_num):
-
     # arrays for epoch summary
     gen_avg_loss = np.array(0, dtype=np.float32)
     perceptual_accuracy = np.array(0, dtype=np.float32)  # in 0..1 range
