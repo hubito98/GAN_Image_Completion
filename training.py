@@ -2,52 +2,55 @@ import tensorflow as tf
 import numpy as np
 import matplotlib.pyplot as plt
 import h5py
-import random
 from models import generator, discriminator
 from preprocessing import mask_images
+from dataset_generator import dataset_generator
 
 tf.enable_eager_execution()
 
+# learning hyperparameters
+epoch_num = 30
+batch_size = 128
+gen_lr = 1e-4
+dis_lr = 1e-5
+min_mask = 10
+max_mask = 80
+image_rotation = 15
+
 # get generator and discriminator model
-gen = generator(input_shape=(64, 64, 3))
-dis = discriminator(input_shape=(64, 64, 3))
+gen = generator(input_shape=(256, 256, 3))
+dis = discriminator(input_shape=(256, 256, 3))
 
 # optimizers for both
-gen_optimizer = tf.train.AdamOptimizer(1e-4)
-dis_optimizer = tf.train.AdamOptimizer(1e-5)
-
-# dataset
-(train_x, _), (_, _) = tf.keras.datasets.cifar10.load_data()
-train_x = (train_x / 255.0).astype(dtype=np.float32)
-# resizing (cifar10 is 32x32x3, but vgg need 64x64x3)
-train_x = tf.image.resize_images(train_x, size=(64, 64))
-
-# 10x10 random mask for images
-mask = tf.ones_like(train_x).numpy()
-for m in mask:
-    size = 10
-    x = random.randint(10, 40)
-    y = random.randint(10, 40)
-    m[y:y + size, x:x + size] = 0
+gen_optimizer = tf.train.AdamOptimizer(gen_lr)
+dis_optimizer = tf.train.AdamOptimizer(dis_lr)
 
 
-masked_train_x = mask_images(images=train_x, mask=mask)
-
-#parameters
-epoch_num = 20
-batch_size = 128
+# dataset generator - basically "infinity" dataset
+dataset_generator = dataset_generator(image_dimensions=(256, 256), directory="./images",
+                                      min_mask=min_mask, max_mask=max_mask, rotation=image_rotation,
+                                      batch_size=batch_size*20)
+dataset_generator.generate_dataset()
 
 for episode in range(epoch_num):
+    # get train batch for epoch
+    images, mask = dataset_generator.get_batch()
+    masked_train_x = mask_images(images=images, mask=mask)
+
     # arrays for epoch summary
     gen_avg_loss = np.array(0, dtype=np.float32)
     perceptual_accuracy = np.array(0, dtype=np.float32)  # in 0..1 range
     dis_avg_real_accuracy = np.array(0, dtype=np.float32)  # in 0..1 range
     dis_avg_fake_accuracy = np.array(0, dtype=np.float32)  # in 0..1 range
 
-    for step in range(int(len(train_x) / batch_size)):
-        real_images = train_x[step * batch_size: (step + 1) * batch_size]
+    for step in range(int(len(masked_train_x) / batch_size)):
+        real_images = images[step * batch_size: (step + 1) * batch_size]
         batch_mask = mask[step * batch_size: (step + 1) * batch_size]
+        # 0.5 value pixels on hole
         masked_images = masked_train_x[step * batch_size: (step + 1) * batch_size]
+
+        plt.imshow(masked_images[0])
+        plt.show()
 
         with tf.GradientTape() as gen_tape, tf.GradientTape() as dis_tape:
             # we want this to look like normal image, no holes
@@ -95,44 +98,27 @@ for episode in range(epoch_num):
         dis_avg_real_accuracy += dis_real_accuracy
         dis_avg_fake_accuracy += dis_fake_accuracy
 
+        # update discriminator weights for 5 episodes then only 1 per 4 epoch
         gen_gradients = gen_tape.gradient(gen_loss, gen.trainable_variables)
-        if episode < 5:
+        if episode < 5 or episode % 4 == 0:
             dis_gradients = dis_tape.gradient(dis_loss, dis.trainable_variables)
 
         gen_optimizer.apply_gradients(zip(gen_gradients, gen.trainable_variables))
-        if episode < 5:
+        if episode < 5 or episode % 4 == 0:
             dis_optimizer.apply_gradients(zip(dis_gradients, dis.trainable_variables))
 
+        # after every 10 step put "."
         if step % 10 == 9:
             print(".", end="")
 
     print("\nEpisode {}, dis acc: fake {} real {}, perceptual_acc {}, gen_loss: {}".
           format(episode, dis_avg_fake_accuracy / (step + 1), dis_avg_real_accuracy / (step + 1),
                  perceptual_accuracy / (step + 1), gen_avg_loss / (step + 1)))
+    # saving generator and discriminator weights with info in name after every epoch
+    gen.save_weights(filepath="./weights/generator_epoch{}_metrics{}, {}, {}, {}.h5"
+                     .format(episode, dis_avg_fake_accuracy / (step + 1), dis_avg_real_accuracy / (step + 1),
+                             perceptual_accuracy / (step + 1), gen_avg_loss / (step + 1)))
+    dis.save_weights(filepath="./weights/discriminator_epoch{}_metrics{}, {}, {}, {}.h5"
+                     .format(episode, dis_avg_fake_accuracy / (step + 1), dis_avg_real_accuracy / (step + 1),
+                             perceptual_accuracy / (step + 1), gen_avg_loss / (step + 1)))
 
-# saving models weights
-gen.save_weights(filepath="./generator.h5")
-dis.save_weights(filepath="./discriminator.h5")
-
-# see how it works on not seen images
-(_, _), (test_x, _) = tf.keras.datasets.cifar10.load_data()
-test_x = (test_x / 255.0).astype(dtype=np.float32)
-
-test_x = tf.image.resize_images(test_x[:10], size=(64, 64))
-
-masked_images = test_x[:6] * mask[:6] + (np.abs(mask[:6] - 1) / 2.0)
-
-image = gen(masked_images, training=False)
-for i, im in enumerate(image):
-    plt.subplot(3, 6, i + 1)
-    plt.imshow(im)
-
-for i in range(6):
-    plt.subplot(3, 6, i + 1 + 6)
-    plt.imshow(masked_images[i])
-
-for i in range(6):
-    plt.subplot(3, 6, i + 1 + 12)
-    plt.imshow(test_x[i])
-
-plt.show()
