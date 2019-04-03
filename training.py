@@ -16,7 +16,7 @@ dis_lr = 1e-5
 min_mask = 10
 max_mask = 80
 image_rotation = 15
-images_in_epoch = batch_size*320
+images_in_epoch = batch_size * 320
 
 # get generator and discriminator model
 gen = generator(input_shape=(256, 256, 3))
@@ -26,13 +26,15 @@ dis = discriminator(input_shape=(256, 256, 3))
 gen_optimizer = tf.train.AdamOptimizer(gen_lr)
 dis_optimizer = tf.train.AdamOptimizer(dis_lr)
 
-
 # dataset generator - basically "infinity" dataset
 dataset_generator = dataset_generator(image_dimensions=(256, 256), directory="./images",
                                       min_mask=min_mask, max_mask=max_mask, rotation=image_rotation,
                                       batch_size=batch_size)
 dataset_generator.generate_dataset()
 
+# training data logging
+file = open("loss.csv", "w+")
+file.write("episode;fake_acc;real_acc;perceptual_acc;gen_loss\n")
 for episode in range(epoch_num):
     # arrays for epoch summary
     gen_avg_loss = np.array(0, dtype=np.float32)
@@ -103,7 +105,9 @@ for episode in range(epoch_num):
         # after every 10 step put "."
         if step % 10 == 9:
             print(".", end="")
-
+    file.write("{};{};{};{};{}\n".
+               format(episode, dis_avg_fake_accuracy / (step + 1), dis_avg_real_accuracy / (step + 1),
+                      perceptual_accuracy / (step + 1), gen_avg_loss / (step + 1)))
     print("\nEpisode {}, dis acc: fake {} real {}, perceptual_acc {}, gen_loss: {}".
           format(episode, dis_avg_fake_accuracy / (step + 1), dis_avg_real_accuracy / (step + 1),
                  perceptual_accuracy / (step + 1), gen_avg_loss / (step + 1)))
@@ -114,4 +118,4 @@ for episode in range(epoch_num):
     dis.save_weights(filepath="./weights/discriminator_epoch{}_metrics{}, {}, {}, {}.h5"
                      .format(episode, dis_avg_fake_accuracy / (step + 1), dis_avg_real_accuracy / (step + 1),
                              perceptual_accuracy / (step + 1), gen_avg_loss / (step + 1)))
-
+file.close()
