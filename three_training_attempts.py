@@ -241,13 +241,14 @@ file.close()
 #     - same as SECOND ATTEMPT
 #     - after 10 episodes discriminator stop to learn
 #     - first two kernel_size is 7 and 5, was 3 and 3
+#     - lower discriminator lr (was 1e-5 is 1e-6)
 
 
 # learning hyperparameters
 epoch_num = 50
 batch_size = 8
 gen_lr = 1e-4
-dis_lr = 1e-5
+dis_lr = 1e-6
 min_mask = 10
 max_mask = 80
 image_rotation = 15
