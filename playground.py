@@ -1,14 +1,17 @@
 from dataset_generator import dataset_generator
-from models import generator
+from models import generator, generator_2
 from preprocessing import mask_images
 import matplotlib.pyplot as plt
 import tensorflow as tf
 
 tf.enable_eager_execution()
 
+weights_path = "./weights1/generator_epoch49_metrics0.995703125, 0.93515625, 0.004296875, 1611.6302734375.h5"
+# weights_path = "./weights2/generator_epoch49_metrics0.987890625, 0.9890625, 0.012109375, 2273.9853515625.h5"
+# weights_path = "./weights3/generator_epoch49_metrics0.55625, 0.999609375, 0.44375, 2267.0431640625.h5"
+
 gen = generator((128, 128, 3))
-# gen.load_weights("./weights/generator_epoch24_metrics0.89296875, 0.921875, 0.10703125, 2025.21171875.h5")
-gen.load_weights("./weights/generator_epoch29_metrics0.994140625, 0.9671875, 0.005859375, 2014.2529296875.h5")
+gen.load_weights(weights_path)
 
 data_gen = dataset_generator(image_dimensions=(256, 256), directory="./images",
                              min_mask=10, max_mask=80, rotation=15, batch_size=3)
