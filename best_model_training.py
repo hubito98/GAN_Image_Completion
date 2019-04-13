@@ -11,7 +11,7 @@ tf.enable_eager_execution()
 # learning hyperparameters
 epoch_num = 50
 batch_size = 8
-gen_lr = 1e-9
+gen_lr = 1e-4
 dis_lr = 1e-7
 min_mask = 10
 max_mask = 80
@@ -22,11 +22,11 @@ images_in_epoch = batch_size * 320
 gen = generator(input_shape=(256, 256, 3))
 dis = discriminator(input_shape=(256, 256, 3))
 
-gen.load_weights("./weights1/generator_epoch49_metrics0.995703125, 0.93515625, 0.004296875, 1611.6302734375.h5")
-dis.load_weights("./weights1/discriminator_epoch49_metrics0.995703125, 0.93515625, 0.004296875, 1611.6302734375.h5")
+gen.load_weights("./best_weights/generator_epoch49_metrics0.981640625, 0.996484375, 0.018359375, 1439.47041015625.h5")
+dis.load_weights("./best_weights/discriminator_epoch49_metrics0.981640625, 0.996484375, 0.018359375, 1439.47041015625.h5")
 
 # optimizers for both
-gen_optimizer = tf.train.GradientDescentOptimizer(gen_lr)
+gen_optimizer = tf.train.AdamOptimizer(gen_lr)
 dis_optimizer = tf.train.GradientDescentOptimizer(dis_lr)
 
 # dataset generator - basically "infinity" dataset
@@ -36,7 +36,7 @@ dataset_generator = dataset_generator(image_dimensions=(256, 256), directory="./
 dataset_generator.generate_dataset()
 
 # training data logging
-file = open("loss1_part2.csv", "w+")
+file = open("loss1_part3.csv", "w+")
 file.write("episode;fake_acc;real_acc;perceptual_acc;gen_loss\n")
 for episode in range(epoch_num):
     # arrays for epoch summary
@@ -98,12 +98,12 @@ for episode in range(epoch_num):
 
         # update discriminator weights for 5 episodes then only 1 per 4 epoch
         gen_gradients = gen_tape.gradient(gen_loss, gen.trainable_variables)
-        if episode % 10 == 0:
-            dis_gradients = dis_tape.gradient(dis_loss, dis.trainable_variables)
+        # if episode % 10 == 0:
+        #     dis_gradients = dis_tape.gradient(dis_loss, dis.trainable_variables)
 
         gen_optimizer.apply_gradients(zip(gen_gradients, gen.trainable_variables))
-        if episode % 10 == 0:
-            dis_optimizer.apply_gradients(zip(dis_gradients, dis.trainable_variables))
+        # if episode % 10 == 0:
+        #     dis_optimizer.apply_gradients(zip(dis_gradients, dis.trainable_variables))
 
         # after every 40 step put "."
         if step % 40 == 39:
@@ -119,7 +119,7 @@ for episode in range(epoch_num):
         gen.save_weights(filepath="./best_weights/generator_epoch{}_metrics{}, {}, {}, {}.h5"
                          .format(episode, dis_avg_fake_accuracy / (step + 1), dis_avg_real_accuracy / (step + 1),
                                  perceptual_accuracy / (step + 1), gen_avg_loss / (step + 1)))
-        dis.save_weights(filepath="./best_weights/discriminator_epoch{}_metrics{}, {}, {}, {}.h5"
-                         .format(episode, dis_avg_fake_accuracy / (step + 1), dis_avg_real_accuracy / (step + 1),
-                                 perceptual_accuracy / (step + 1), gen_avg_loss / (step + 1)))
+        # dis.save_weights(filepath="./best_weights/discriminator_epoch{}_metrics{}, {}, {}, {}.h5"
+        #                  .format(episode, dis_avg_fake_accuracy / (step + 1), dis_avg_real_accuracy / (step + 1),
+        #                          perceptual_accuracy / (step + 1), gen_avg_loss / (step + 1)))
 file.close()

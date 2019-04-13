@@ -6,9 +6,10 @@ import tensorflow as tf
 
 tf.enable_eager_execution()
 
-weights_path = "./weights1/generator_epoch49_metrics0.995703125, 0.93515625, 0.004296875, 1611.6302734375.h5"
+# weights_path = "./weights1/generator_epoch49_metrics0.995703125, 0.93515625, 0.004296875, 1611.6302734375.h5"
 # weights_path = "./weights2/generator_epoch49_metrics0.987890625, 0.9890625, 0.012109375, 2273.9853515625.h5"
 # weights_path = "./weights3/generator_epoch49_metrics0.55625, 0.999609375, 0.44375, 2267.0431640625.h5"
+weights_path = "./best_weights/generator_epoch49_metrics0.981640625, 0.996484375, 0.018359375, 1439.47041015625.h5"
 
 gen = generator((128, 128, 3))
 gen.load_weights(weights_path)
