@@ -9,7 +9,7 @@ from dataset_generator import dataset_generator
 tf.enable_eager_execution()
 
 # learning hyperparameters
-epoch_num = 50
+epoch_num = 250
 batch_size = 8
 gen_lr = 1e-4
 dis_lr = 1e-7
@@ -22,7 +22,7 @@ images_in_epoch = batch_size * 320
 gen = generator(input_shape=(256, 256, 3))
 dis = discriminator(input_shape=(256, 256, 3))
 
-gen.load_weights("./best_weights/generator_epoch49_metrics0.981640625, 0.996484375, 0.018359375, 1439.47041015625.h5")
+gen.load_weights("./best_weights/generator_epoch49_metrics0.9265625, 0.996875, 0.0734375, 1303.67607421875.h5")
 dis.load_weights("./best_weights/discriminator_epoch49_metrics0.981640625, 0.996484375, 0.018359375, 1439.47041015625.h5")
 
 # optimizers for both
@@ -36,7 +36,7 @@ dataset_generator = dataset_generator(image_dimensions=(256, 256), directory="./
 dataset_generator.generate_dataset()
 
 # training data logging
-file = open("loss1_part3.csv", "w+")
+file = open("loss1_part4.csv", "w+")
 file.write("episode;fake_acc;real_acc;perceptual_acc;gen_loss\n")
 for episode in range(epoch_num):
     # arrays for epoch summary
@@ -114,7 +114,7 @@ for episode in range(epoch_num):
     print("\nEpisode {}, dis acc: fake {} real {}, perceptual_acc {}, gen_loss: {}".
           format(episode, dis_avg_fake_accuracy / (step + 1), dis_avg_real_accuracy / (step + 1),
                  perceptual_accuracy / (step + 1), gen_avg_loss / (step + 1)))
-    if episode % 10 == 9:
+    if episode % 50 == 9:
         # saving generator and discriminator weights with info in name after every epoch
         gen.save_weights(filepath="./best_weights/generator_epoch{}_metrics{}, {}, {}, {}.h5"
                          .format(episode, dis_avg_fake_accuracy / (step + 1), dis_avg_real_accuracy / (step + 1),
