@@ -17,7 +17,7 @@ def get_image(path):
 
 
 def get_mask(x, y, width, height):
-    if 0 > x > 256 or 0 > y > 256 or x + width > 256 or x + height > 256 \
+    if 0 > x > 256 or 0 > y > 256 or x + width > 256 or y + height > 256 \
             or 0 > width > 80 or 0 > height > 80:
         raise Exception
     mask = np.ones((1, 256, 256, 3), dtype=np.float32)
